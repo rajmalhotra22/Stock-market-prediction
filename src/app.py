@@ -140,6 +140,43 @@ predicted_prices = scaler.inverse_transform(
 )[:, close_index]
 
 # =========================================================
+# PREDICTION QUALITY SUMMARY
+# =========================================================
+
+directional_actual = np.sign(np.diff(actual_prices))
+directional_predicted = np.sign(np.diff(predicted_prices))
+
+valid_direction_mask = (
+    (directional_actual != 0)
+    & (directional_predicted != 0)
+)
+
+directional_accuracy = (
+    np.mean(
+        directional_actual[valid_direction_mask]
+        == directional_predicted[valid_direction_mask]
+    )
+    * 100
+    if np.any(valid_direction_mask)
+    else 0.0
+)
+
+last_actual_price = float(actual_prices[-1])
+last_predicted_price = float(predicted_prices[-1])
+
+last_prediction_error_pct = (
+    abs(last_predicted_price - last_actual_price)
+    / last_actual_price * 100
+    if last_actual_price != 0
+    else 0.0
+)
+
+last_prediction_accuracy = max(
+    0.0,
+    min(100.0, 100.0 - (last_prediction_error_pct * 4.0))
+)
+
+# =========================================================
 # SESSION STATE FOR FUTURE PREDICTION
 # =========================================================
 
@@ -261,7 +298,7 @@ real_rmse = np.sqrt(
 # DISPLAY PERFORMANCE
 # =========================================================
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
@@ -281,9 +318,16 @@ with col3:
         f"{r2:.4f}"
     )
 
+with col4:
+    st.metric(
+        "Last Prediction Accuracy",
+        f"{last_prediction_accuracy:.2f}%"
+    )
+
 st.caption(
     f"Normalized MAE: {mae:.4f} | "
-    f"Normalized RMSE: {rmse:.4f}"
+    f"Normalized RMSE: {rmse:.4f} | "
+    f"Directional accuracy: {directional_accuracy:.2f}%"
 )
 
 st.divider()
@@ -496,6 +540,29 @@ with col3:
             "Expected Change",
             "—"
         )
+
+if future_price is not None and current_price > 0:
+    change = future_price - current_price
+    change_percent = (change / current_price) * 100
+    current_prediction_success = max(
+        0.0,
+        min(
+            100.0,
+            (directional_accuracy * 0.7)
+            + (max(r2, 0.0) * 100 * 0.3)
+            + (50.0 if change_percent > 0 else 0.0)
+            - (abs(change_percent) * 0.8)
+        )
+    )
+
+    st.caption(
+        f"Chance of current prediction success: "
+        f"{current_prediction_success:.2f}%"
+    )
+    st.progress(current_prediction_success / 100)
+
+else:
+    st.caption("Chance of current prediction success: not available yet.")
 
 # =========================================================
 # EXPECTED TREND
