@@ -7,3 +7,4 @@ joblib
 matplotlib
 yfinance
 ta
+Flask
